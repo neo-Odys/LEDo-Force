@@ -50,13 +50,49 @@ int durations[] = {
   1
 };
 
+
+#include <MD_MAX72xx.h> 
+
+#define HARDWARE_TYPE MD_MAX72XX::FC16_HW 
+#define MAX_DEVICES 4
+#define CS_PIN 10
+
+MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
+
+
+void drawLightsaber() {
+  for (int i = 2; i < 32; i++) {
+    for(int y = 2; y <7; y++){
+      mx.setPoint(y, i, true);  
+    }
+    
+    
+    delay(15); 
+  }
+}
+
 void setup()
 {
   pinMode(BUZZER_PIN, OUTPUT);
+    mx.begin();     
+                        
+  mx.control(MD_MAX72XX::INTENSITY, 8); 
+  pinMode(BUZZER_PIN, OUTPUT);
+  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+  randomSeed(analogRead(0));
+  
+      mx.clear(); 
+    mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+    drawLightsaber();
+    mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+    
+
 }
 
 void loop()
 {
+
+  /*
   int size = sizeof(durations) / sizeof(int);
 
   for (int note = 0; note < size; note++) {
@@ -72,5 +108,5 @@ void loop()
 
     //stop the tone playing:
     noTone(BUZZER_PIN);
-  }
+  }*/
 }
