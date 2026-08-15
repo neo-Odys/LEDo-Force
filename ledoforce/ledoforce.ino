@@ -1,3 +1,6 @@
+
+
+/*  NOT USED YET
 // -------------------------------------------------
 // Copyright (c) 2022 HiBit <https://www.hibit.dev>
 // -------------------------------------------------
@@ -49,7 +52,7 @@ int durations[] = {
   4, 8, 4, 8, 4, 8, 4, 8,
   1
 };
-
+*/
 
 #include <MD_MAX72xx.h> 
 
@@ -71,26 +74,114 @@ void drawLightsaber() {
   }
 }
 
+ 
+
+// FROM pomidoro project
+
+typedef struct {
+  int height;
+  int width;
+  uint64_t characters[10];
+  bool is_number;
+} font_t;
+
+void drawCharacter(int startX, int num, font_t used_font);
+int seconds = 1186;
+font_t used_font_num;
+
+https://xantorohara.github.io/led-matrix-editor/#001f1111111f0000|0011111f10100000|001d151515170000|00151515151f0000|00070404041f0000|00171515151d0000|001f1515151d0000|0001011905030000|001f1515151f0000|00171515151f0000
+font_t FONT_NUM_VAD{
+  7,
+  6,
+  {
+  0x001f1111111f0000,
+  0x0011111f10100000,
+  0x001d151515170000,
+  0x00151515151f0000,
+  0x00070404041f0000,
+  0x00171515151d0000,
+  0x001f1515151d0000,
+  0x0001011905030000,
+  0x001f1515151f0000,
+  0x00171515151f0000
+  },
+  true
+};
+
+void drawCharacter(int startX, int num, font_t used_font) {
+  uint64_t character = used_font.characters[num];
+
+  for (int row = (8 - used_font.height); row < 8; row++) {
+    byte line = (character >> (row * 8)) & 0xFF;
+    for (int col = 0; col < used_font.width; col++) {
+      bool pointInflamed = bitRead(line, col);
+      mx.setPoint(row, startX - col, pointInflamed);
+    }
+  }
+}
+
+void drawSeparator() {
+
+    mx.setPoint(5, 16, true);
+    mx.setPoint(5, 17, true);
+
+    mx.setPoint(3, 16, true);
+    mx.setPoint(3, 17, true);
+  
+  
+}
+void drawPomodoroTime(int seconds){  
+  
+  int timeSeconds    = (seconds % 60) % 10;
+  int timeTenSeconds = (seconds % 60) / 10;
+  int timeMin        = (seconds / 60) % 10; 
+  int timeTenMin     = (seconds / 60) / 10; 
+
+  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+  mx.clear(); 
+
+  drawCharacter( 17 + (2 * used_font_num.width) + 2, timeTenMin, used_font_num);
+  drawCharacter( 17 + used_font_num.width + 1, timeMin, used_font_num);
+  drawCharacter(14, timeTenSeconds, used_font_num);
+  drawCharacter(14 - used_font_num.width - 1, timeSeconds, used_font_num);
+
+  drawSeparator();
+
+  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+}
+
+
 void setup()
 {
-  pinMode(BUZZER_PIN, OUTPUT);
-    mx.begin();     
+  used_font_num = FONT_NUM_VAD;
+//  pinMode(BUZZER_PIN, OUTPUT);
+  mx.begin();     
                         
   mx.control(MD_MAX72XX::INTENSITY, 8); 
-  pinMode(BUZZER_PIN, OUTPUT);
+  //pinMode(BUZZER_PIN, OUTPUT);
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
   randomSeed(analogRead(0));
   
-      mx.clear(); 
-    mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
-    drawLightsaber();
-    mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
-    
-
+  mx.clear(); 
+  delay(2000);
+  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+  drawLightsaber();
+  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+  // for testing
+  delay(2000);
 }
 
+unsigned long lastExecutedMillis = 0;
 void loop()
 {
+  unsigned long currentMillis = millis(); //it will be clock module in the future
+  if (currentMillis - lastExecutedMillis >= 60000) {
+    lastExecutedMillis = currentMillis; 
+    
+    drawPomodoroTime(seconds);
+    
+    seconds++;
+  }
 
   /*
   int size = sizeof(durations) / sizeof(int);
