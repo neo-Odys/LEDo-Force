@@ -4,6 +4,13 @@
 #define MAX_DEVICES 4
 #define CS_PIN 10
 
+enum States {
+  POMODORO,
+  CLOCK,
+  LIGHSABER
+}; 
+
+States actualState = POMODORO;
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 
 void drawLightsaber() {
@@ -16,7 +23,6 @@ void drawLightsaber() {
   }
 }
 
-// FROM pomidoro project
 
 typedef struct {
   int height;
@@ -95,6 +101,7 @@ void drawPomodoroTime(int seconds){
 void setup()
 {
   used_font_num = FONT_NUM_VAD;
+  actualState = POMODORO;
 //  pinMode(BUZZER_PIN, OUTPUT);
   mx.begin();     
                         
@@ -110,19 +117,42 @@ void setup()
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
   // for testing
   delay(2000);
+  switch (actualState) {
+    case POMODORO:
+      seconds = 100;
+      break;
+    case CLOCK:
+      break;
+
+  }
+  
 }
 
 unsigned long lastExecutedMillis = 0;
+bool pomodoro_is_break = false;
 void loop()
 {
+  
   unsigned long currentMillis = millis(); //it will be clock module in the future
-  if (currentMillis - lastExecutedMillis >= 60000) {
-    lastExecutedMillis = currentMillis; 
-    
-    drawPomodoroTime(seconds);
-    
-    seconds++;
+
+  if(actualState == POMODORO ){
+    if (currentMillis - lastExecutedMillis >= 1000) {
+      lastExecutedMillis = currentMillis; 
+      
+      drawPomodoroTime(seconds);
+      if(seconds == 0){
+        if(pomodoro_is_break){
+          seconds = 100;
+          pomodoro_is_break = false;
+        }else{
+          seconds = 30;
+          pomodoro_is_break = true;
+        }
+      }
+      seconds--;
+    }
   }
+  
 
   /*
   int size = sizeof(durations) / sizeof(int);
