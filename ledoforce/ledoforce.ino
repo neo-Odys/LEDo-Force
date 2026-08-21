@@ -3,25 +3,17 @@
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW 
 #define MAX_DEVICES 4
 #define CS_PIN 10
-
+#define LED_INTENSITY 4
 enum States {
   POMODORO,
   CLOCK,
-  LIGHSABER
+  LIGHTSABER
 }; 
+const States actualState = POMODORO;
+unsigned long lastExecutedMillis = 0;
 
-States actualState = POMODORO;
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 
-void drawLightsaber() {
-  for (int i = 2; i < 32; i++) {
-    for(int y = 2; y <7; y++){
-      mx.setPoint(y, i, true);  
-    }
-    
-    delay(15); 
-  }
-}
 
 
 typedef struct {
@@ -32,13 +24,12 @@ typedef struct {
 } font_t;
 
 void drawCharacter(int startX, int num, font_t used_font);
-int seconds = 1186;
 font_t used_font_num;
 
 //https://xantorohara.github.io/led-matrix-editor/#001f1111111f0000|0011111f10100000|001d151515170000|00151515151f0000|00070404041f0000|00171515151d0000|001f1515151d0000|0001011905030000|001f1515151f0000|00171515151f0000
 font_t FONT_NUM_VAD{
   7,
-  6,
+  5,
   {
   0x001f1111111f0000,
   0x0011111f10100000,
@@ -53,6 +44,20 @@ font_t FONT_NUM_VAD{
   },
   true
 };
+
+font_t FONT_BREAK{
+  7,
+  5,
+  {
+  0x001f1515151a0000,
+  0x001f0505051a0000,
+  0x001f151515150000,
+  0x001e0505051e0000,
+  0x001f040406190000
+  },
+  true
+};
+
 
 void drawCharacter(int startX, int num, font_t used_font) {
   uint64_t character = used_font.characters[num];
@@ -69,13 +74,53 @@ void drawCharacter(int startX, int num, font_t used_font) {
 }
 
 void drawSeparator() {
-
     mx.setPoint(5, 16, true);
     mx.setPoint(5, 17, true);
-
     mx.setPoint(3, 16, true);
     mx.setPoint(3, 17, true);
-  
+}
+
+// LIGHTSABER STATE
+void drawLightsaber() {
+  for (int i = 2; i < 32; i++) {
+    for(int y = 2; y <7; y++){
+      mx.setPoint(y, i, true);  
+    }
+    
+    delay(15); 
+  }
+}
+int randTime = random(500, 3000);
+void lighsaberLoop(unsigned long currentMillis){
+  if (currentMillis - lastExecutedMillis >= randTime) {
+    lastExecutedMillis = currentMillis; 
+    mx.control(MD_MAX72XX::INTENSITY, random(1,8));
+    randTime = random(500, 3000);
+  }
+}
+// POMODORO STATE
+#define POMODORO_WORK 3000
+#define POMODORO_BREAK 600
+
+int pomodoro_seconds = POMODORO_BREAK;
+bool pomodoro_is_break = true;
+bool pomodoro_break_blink = true;
+void pomodoroLoop(unsigned long currentMillis){
+  if (currentMillis - lastExecutedMillis >= 1000) {
+      lastExecutedMillis = currentMillis; 
+      
+      drawPomodoroTime(pomodoro_seconds);
+      if(pomodoro_seconds == 0){
+        if(pomodoro_is_break){
+          pomodoro_seconds = POMODORO_WORK;
+          pomodoro_is_break = false;
+        }else{
+          pomodoro_seconds = POMODORO_BREAK;
+          pomodoro_is_break = true;
+        }
+      }
+      pomodoro_seconds--;
+    }
 }
 void drawPomodoroTime(int seconds){  
   
@@ -86,14 +131,35 @@ void drawPomodoroTime(int seconds){
 
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
   mx.clear(); 
+  if(pomodoro_is_break){
 
-  drawCharacter( 17 + (2 * used_font_num.width) + 2, timeTenMin, used_font_num);
-  drawCharacter( 17 + used_font_num.width + 1, timeMin, used_font_num);
-  drawCharacter(14, timeTenSeconds, used_font_num);
-  drawCharacter(14 - used_font_num.width - 1, timeSeconds, used_font_num);
+    if(pomodoro_break_blink){
+      for(int i = 0; i < 5; i++)
+      {
+        drawCharacter(31 - (i*used_font_num.width) - i, i, FONT_BREAK);
+      }
+      pomodoro_break_blink = false;
+    }else{
+      drawCharacter( 17 + (2 * used_font_num.width) + 2, timeTenMin, used_font_num);
+      drawCharacter( 17 + used_font_num.width + 1, timeMin, used_font_num);
+      drawCharacter(14, timeTenSeconds, used_font_num);
+      drawCharacter(14 - used_font_num.width - 1, timeSeconds, used_font_num);
+      drawSeparator();
+      pomodoro_break_blink = true;
+    }
+    
 
-  drawSeparator();
+  } else{
+    
+    drawCharacter( 17 + (2 * used_font_num.width) + 2, timeTenMin, used_font_num);
+    drawCharacter( 17 + used_font_num.width + 1, timeMin, used_font_num);
+    drawCharacter(14, timeTenSeconds, used_font_num);
+    drawCharacter(14 - used_font_num.width - 1, timeSeconds, used_font_num);
 
+    drawSeparator();
+
+  }
+  
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
 }
 
@@ -101,11 +167,11 @@ void drawPomodoroTime(int seconds){
 void setup()
 {
   used_font_num = FONT_NUM_VAD;
-  actualState = POMODORO;
-//  pinMode(BUZZER_PIN, OUTPUT);
+  randomSeed(analogRead(0));
+//pinMode(BUZZER_PIN, OUTPUT);
   mx.begin();     
                         
-  mx.control(MD_MAX72XX::INTENSITY, 8); 
+  mx.control(MD_MAX72XX::INTENSITY, LED_INTENSITY); 
   //pinMode(BUZZER_PIN, OUTPUT);
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
   randomSeed(analogRead(0));
@@ -119,7 +185,7 @@ void setup()
   delay(2000);
   switch (actualState) {
     case POMODORO:
-      seconds = 100;
+      
       break;
     case CLOCK:
       break;
@@ -128,47 +194,24 @@ void setup()
   
 }
 
-unsigned long lastExecutedMillis = 0;
-bool pomodoro_is_break = false;
 void loop()
 {
   
   unsigned long currentMillis = millis(); //it will be clock module in the future
 
+  switch (actualState) {
+    case POMODORO:
+      pomodoroLoop(currentMillis);
+      break;
+    case CLOCK:
+      break;
+    case LIGHTSABER:
+      lighsaberLoop(currentMillis);
+      break;
+
+  }
   if(actualState == POMODORO ){
-    if (currentMillis - lastExecutedMillis >= 1000) {
-      lastExecutedMillis = currentMillis; 
-      
-      drawPomodoroTime(seconds);
-      if(seconds == 0){
-        if(pomodoro_is_break){
-          seconds = 100;
-          pomodoro_is_break = false;
-        }else{
-          seconds = 30;
-          pomodoro_is_break = true;
-        }
-      }
-      seconds--;
-    }
+    
   }
   
-
-  /*
-  int size = sizeof(durations) / sizeof(int);
-
-  for (int note = 0; note < size; note++) {
-    //to calculate the note duration, take one second divided by the note type.
-    //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
-    int duration = 1000 / durations[note];
-    tone(BUZZER_PIN, melody[note], duration);
-
-    //to distinguish the notes, set a minimum time between them.
-    //the note's duration + 30% seems to work well:
-    int pauseBetweenNotes = duration * 1.30;
-    delay(pauseBetweenNotes);
-
-    //stop the tone playing:
-    noTone(BUZZER_PIN);
-  }*/
 }
