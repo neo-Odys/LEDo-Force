@@ -4,18 +4,18 @@
 #define MAX_DEVICES 4
 #define CS_PIN 10
 #define LED_INTENSITY 4
+MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
+
+
 enum States {
   POMODORO,
-  CLOCK,
+  CLOCK, //not working for now
   LIGHTSABER
 }; 
 const States actualState = POMODORO;
 unsigned long lastExecutedMillis = 0;
 
-MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
-
-
-
+// FONTS
 typedef struct {
   int height;
   int width;
@@ -23,8 +23,6 @@ typedef struct {
   bool is_number;
 } font_t;
 
-void drawCharacter(int startX, int num, font_t used_font);
-font_t used_font_num;
 
 //https://xantorohara.github.io/led-matrix-editor/#001f1111111f0000|0011111f10100000|001d151515170000|00151515151f0000|00070404041f0000|00171515151d0000|001f1515151d0000|0001011905030000|001f1515151f0000|00171515151f0000
 font_t FONT_NUM_VAD{
@@ -44,7 +42,9 @@ font_t FONT_NUM_VAD{
   },
   true
 };
+const font_t used_font_num = FONT_NUM_VAD;
 
+//https://xantorohara.github.io/led-matrix-editor/#001f1515151a0000|001f0505051a0000|001f151515150000|001e0505051e0000|001f040406190000
 font_t FONT_BREAK{
   7,
   5,
@@ -59,7 +59,8 @@ font_t FONT_BREAK{
 };
 
 
-void drawCharacter(int startX, int num, font_t used_font) {
+// DRAWING 
+void drawCharacter(int startX, int num, const font_t& used_font) {
   uint64_t character = used_font.characters[num];
   
   // AI MADE THIS:
@@ -72,7 +73,6 @@ void drawCharacter(int startX, int num, font_t used_font) {
   }
   // END OF AI
 }
-
 void drawSeparator() {
     mx.setPoint(5, 16, true);
     mx.setPoint(5, 17, true);
@@ -80,8 +80,14 @@ void drawSeparator() {
     mx.setPoint(3, 17, true);
 }
 
+
+//
 // LIGHTSABER STATE
+//
+
 void drawLightsaber() {
+  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+    
   for (int i = 2; i < 32; i++) {
     for(int y = 2; y <7; y++){
       mx.setPoint(y, i, true);  
@@ -89,8 +95,9 @@ void drawLightsaber() {
     
     delay(15); 
   }
+  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
 }
-int randTime = random(500, 3000);
+int randTime = 0;
 void lighsaberLoop(unsigned long currentMillis){
   if (currentMillis - lastExecutedMillis >= randTime) {
     lastExecutedMillis = currentMillis; 
@@ -98,13 +105,19 @@ void lighsaberLoop(unsigned long currentMillis){
     randTime = random(500, 3000);
   }
 }
+
+//
 // POMODORO STATE
+//
+
 #define POMODORO_WORK 3000
 #define POMODORO_BREAK 600
 
-int pomodoro_seconds = POMODORO_BREAK;
-bool pomodoro_is_break = true;
+int pomodoro_seconds;
+bool pomodoro_is_break = false;
 bool pomodoro_break_blink = true;
+
+
 void pomodoroLoop(unsigned long currentMillis){
   if (currentMillis - lastExecutedMillis >= 1000) {
       lastExecutedMillis = currentMillis; 
@@ -118,6 +131,7 @@ void pomodoroLoop(unsigned long currentMillis){
           pomodoro_seconds = POMODORO_BREAK;
           pomodoro_is_break = true;
         }
+        pomodoro_seconds++; // so it would show 50:00 instead of 49:59
       }
       pomodoro_seconds--;
     }
@@ -147,15 +161,13 @@ void drawPomodoroTime(int seconds){
       drawSeparator();
       pomodoro_break_blink = true;
     }
-    
 
   } else{
-    
+
     drawCharacter( 17 + (2 * used_font_num.width) + 2, timeTenMin, used_font_num);
     drawCharacter( 17 + used_font_num.width + 1, timeMin, used_font_num);
     drawCharacter(14, timeTenSeconds, used_font_num);
     drawCharacter(14 - used_font_num.width - 1, timeSeconds, used_font_num);
-
     drawSeparator();
 
   }
@@ -163,31 +175,31 @@ void drawPomodoroTime(int seconds){
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
 }
 
+//
+// CLOCK STATE
+// to do, 
 
 void setup()
 {
-  used_font_num = FONT_NUM_VAD;
-  randomSeed(analogRead(0));
-//pinMode(BUZZER_PIN, OUTPUT);
+
   mx.begin();     
-                        
   mx.control(MD_MAX72XX::INTENSITY, LED_INTENSITY); 
-  //pinMode(BUZZER_PIN, OUTPUT);
   mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
-  randomSeed(analogRead(0));
-  
-  mx.clear(); 
-  delay(2000);
-  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
-  drawLightsaber();
-  mx.control(MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
-  // for testing
-  delay(2000);
+  mx.clear();
+
   switch (actualState) {
     case POMODORO:
-      
+      if(pomodoro_is_break){
+        pomodoro_seconds = POMODORO_BREAK;
+      }else{
+        pomodoro_seconds = POMODORO_WORK;
+      }
       break;
-    case CLOCK:
+    case LIGHTSABER:
+      delay(2000);
+      randomSeed(analogRead(0));
+      drawLightsaber();
+      delay(2000);
       break;
 
   }
@@ -197,7 +209,8 @@ void setup()
 void loop()
 {
   
-  unsigned long currentMillis = millis(); //it will be clock module in the future
+  unsigned long currentMillis = millis(); //it will be clock module in the future (maybe)
+  // like for pomodoro usage it wouldn't be too big problem
 
   switch (actualState) {
     case POMODORO:
@@ -209,9 +222,8 @@ void loop()
       lighsaberLoop(currentMillis);
       break;
 
-  }
-  if(actualState == POMODORO ){
-    
+    default:
+      break;
   }
   
 }
